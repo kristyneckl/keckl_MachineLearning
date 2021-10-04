@@ -1,0 +1,388 @@
+---
+title: "Assignment 2"
+output: html_document
+-> library(readr)
+> UniversalBank <- read_csv("UniversalBank.csv")
+Rows: 5000 Columns: 14                                                                                                    
+── Column specification ───────────────────────────────────────────────────────────────
+Delimiter: ","
+dbl (14): ID, Age, Experience, Income, ZIP Code, Family, CCAvg, Education, Mortgage...
+
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+> View(UniversalBank)
+> library(psych)
+
+Attaching package: ‘psych’
+
+The following objects are masked from ‘package:ggplot2’:
+
+    %+%, alpha
+
+> library(caret)
+> library(FNN)
+
+Attaching package: ‘FNN’
+
+The following objects are masked from ‘package:class’:
+
+    knn, knn.cv
+
+> library(class)
+> library(dplyr)
+> originaldata <- read.csv("UniversalBank.csv")\
+Error: unexpected '\\' in "originaldata <- read.csv("UniversalBank.csv")\"
+> originaldata <- read.csv("UniversalBank.csv")
+> df=subset(originaldata, select=-c(ID, ZIP.Code ))
+> dummy_Education <- as.data.frame(dummy.code(df$Education))
+> names(dummy_Education) <- c("Education_1", "Education_2","Education_3") #renaming dummy variable
+> df_without_education <- subset(df, select=-c(Education))
+> UBank_data <- cbind(df_without_education, dummy_Education)
+> set.seed(2019)
+> Train_Index     = createDataPartition(UBank_data$Age, p= 0.6 , list=FALSE)
+> Train_Data      = UBank_data[Train_Index,]
+> Validation_Data = UBank_data[-Train_Index,]
+> Test_Data <- data.frame(Age=40 , Experience=10, Income = 84, Family = 2, CCAvg = 2, Education_1 = 0, Education_2 = 1, Education_3 = 0, Mortgage = 0, Securities.Account = 0, CD.Account = 0, Online = 1,  CreditCard = 1, stringsAsFactors = FALSE)
+> train.norm.df    <- Train_Data
+> valid.norm.df    <- Validation_Data
+> test.norm.df     <- Test_Data
+> maindata.norm.df <- UBank_data
+> head(maindata.norm.df)
+  Age Experience Income Family CCAvg Mortgage Personal.Loan Securities.Account
+1  25          1     49      4   1.6        0             0                  1
+2  45         19     34      3   1.5        0             0                  1
+3  39         15     11      1   1.0        0             0                  0
+4  35          9    100      1   2.7        0             0                  0
+5  35          8     45      4   1.0        0             0                  0
+6  37         13     29      4   0.4      155             0                  0
+  CD.Account Online CreditCard Education_1 Education_2 Education_3
+1          0      0          0           1           0           0
+2          0      0          0           1           0           0
+3          0      0          0           1           0           0
+4          0      0          0           0           0           1
+5          0      0          1           0           0           1
+6          0      1          0           0           0           1
+> norm.values <- preProcess(Train_Data[,-7], method=c("center", "scale"))
+> 
+> train.norm.df[,-7] <- predict(norm.values, Train_Data[,-7])
+> valid.norm.df [,-7]<- predict(norm.values, Validation_Data[,-7])
+> test.norm.df <- predict(norm.values, Test_Data)
+> maindata.norm.df[,-7] <- predict(norm.values,UBank_data[,-7])
+> head(maindata.norm.df)
+          Age  Experience     Income     Family      CCAvg   Mortgage Personal.Loan
+1 -1.77433045 -1.66194702 -0.5412194  1.3938471 -0.2037850 -0.5610795             0
+2 -0.02864873 -0.09511012 -0.8671501  0.5222207 -0.2609914 -0.5610795             0
+3 -0.55235324 -0.44329609 -1.3669105 -1.2210321 -0.5470231 -0.5610795             0
+4 -0.90148959 -0.96557506  0.5669449 -1.2210321  0.4254849 -0.5610795             0
+5 -0.90148959 -1.05262156 -0.6281343  1.3938471 -0.5470231 -0.5610795             0
+6 -0.72692141 -0.61738908 -0.9757937  1.3938471 -0.8902612  0.9377628             0
+  Securities.Account CD.Account     Online CreditCard Education_1 Education_2
+1          2.9352543 -0.2510627 -1.2138946 -0.6471267   1.1964328  -0.6460905
+2          2.9352543 -0.2510627 -1.2138946 -0.6471267   1.1964328  -0.6460905
+3         -0.3405725 -0.2510627 -1.2138946 -0.6471267   1.1964328  -0.6460905
+4         -0.3405725 -0.2510627 -1.2138946 -0.6471267  -0.8355394  -0.6460905
+5         -0.3405725 -0.2510627 -1.2138946  1.5447776  -0.8355394  -0.6460905
+6         -0.3405725 -0.2510627  0.8235202 -0.6471267  -0.8355394  -0.6460905
+  Education_3
+1  -0.6455725
+2  -0.6455725
+3  -0.6455725
+4   1.5484966
+5   1.5484966
+6   1.5484966
+> set.seed(2019)
+> prediction <- knn(train = train.norm.df[,-7], test = valid.norm.df[,-7], 
++                   cl = train.norm.df[,7], k = 1, prob=TRUE) 
+> actual= valid.norm.df$Personal.Loan
+> prediction_prob = attr(prediction,"prob")
+> table(prediction,actual)  
+          actual
+prediction    0    1
+         0 1792   58
+         1   23  126
+> mean(prediction==actual)
+[1] 0.9594797
+> #This customer would be classified as a failure class, as they would deny a loan
+> NROW(train.norm.df)
+[1] 3001
+> sqrt(3001)
+[1] 54.78138
+> #Question 2
+> accuracy.df <- data.frame(k = seq(1, 60, 1), accuracy = rep(0, 60))
+> for(i in 1:60) {
++ prediction <- knn(train = train.norm.df[,-7], test = valid.norm.df[-7], 
++                   cl = train.norm.df[,7], k = i, prob=TRUE)
++ accuracy.df[i,2] <- mean(prediction==actual)
++ }
+> accuracy.df  
+    k  accuracy
+1   1 0.9594797
+2   2 0.9519760
+3   3 0.9594797
+4   4 0.9524762
+5   5 0.9564782
+6   6 0.9504752
+7   7 0.9544772
+8   8 0.9514757
+9   9 0.9519760
+10 10 0.9499750
+11 11 0.9529765
+12 12 0.9484742
+13 13 0.9479740
+14 14 0.9464732
+15 15 0.9479740
+16 16 0.9464732
+17 17 0.9484742
+18 18 0.9454727
+19 19 0.9479740
+20 20 0.9439720
+21 21 0.9459730
+22 22 0.9429715
+23 23 0.9444722
+24 24 0.9424712
+25 25 0.9439720
+26 26 0.9414707
+27 27 0.9429715
+28 28 0.9399700
+29 29 0.9409705
+30 30 0.9399700
+31 31 0.9409705
+32 32 0.9384692
+33 33 0.9409705
+34 34 0.9379690
+35 35 0.9394697
+36 36 0.9374687
+37 37 0.9389695
+38 38 0.9369685
+39 39 0.9374687
+40 40 0.9359680
+41 41 0.9359680
+42 42 0.9344672
+43 43 0.9349675
+44 44 0.9334667
+45 45 0.9344672
+46 46 0.9324662
+47 47 0.9329665
+48 48 0.9319660
+49 49 0.9309655
+50 50 0.9309655
+51 51 0.9304652
+52 52 0.9304652
+53 53 0.9294647
+54 54 0.9304652
+55 55 0.9299650
+56 56 0.9294647
+57 57 0.9304652
+58 58 0.9299650
+59 59 0.9294647
+60 60 0.9294647
+> #The value of k that provides the best result is 3 that balances between overfitting and ignoring the predictor intormation.
+> #Question 3
+> library("gmodels")
+Error in library("gmodels") : there is no package called ‘gmodels’
+> table(prediction,actual)  
+          actual
+prediction    0    1
+         0 1814  140
+         1    1   44
+> install.packages("gmodels")
+also installing the dependency ‘gdata’
+
+trying URL 'https://cran.rstudio.com/bin/macosx/contrib/4.1/gdata_2.18.0.tgz'
+Content type 'application/x-gzip' length 1219791 bytes (1.2 MB)
+==================================================
+downloaded 1.2 MB
+
+trying URL 'https://cran.rstudio.com/bin/macosx/contrib/4.1/gmodels_2.18.1.tgz'
+Content type 'application/x-gzip' length 112371 bytes (109 KB)
+==================================================
+downloaded 109 KB
+
+
+The downloaded binary packages are in
+	/var/folders/l7/t4j2c62s6hq3q7_ryjswc7380000gn/T//RtmpJN5UnC/downloaded_packages
+> library("gmodels")
+Registered S3 method overwritten by 'gdata':
+  method         from  
+  reorder.factor gplots
+> CrossTable(x=prediction,y=actual)
+
+ 
+   Cell Contents
+|-------------------------|
+|                       N |
+| Chi-square contribution |
+|           N / Row Total |
+|           N / Col Total |
+|         N / Table Total |
+|-------------------------|
+
+ 
+Total Observations in Table:  1999 
+
+ 
+             | actual 
+  prediction |         0 |         1 | Row Total | 
+-------------|-----------|-----------|-----------|
+           0 |      1814 |       140 |      1954 | 
+             |     0.895 |     8.833 |           | 
+             |     0.928 |     0.072 |     0.977 | 
+             |     0.999 |     0.761 |           | 
+             |     0.907 |     0.070 |           | 
+-------------|-----------|-----------|-----------|
+           1 |         1 |        44 |        45 | 
+             |    38.882 |   383.541 |           | 
+             |     0.022 |     0.978 |     0.023 | 
+             |     0.001 |     0.239 |           | 
+             |     0.001 |     0.022 |           | 
+-------------|-----------|-----------|-----------|
+Column Total |      1815 |       184 |      1999 | 
+             |     0.908 |     0.092 |           | 
+-------------|-----------|-----------|-----------|
+
+ 
+> #141 predictions were wrong out of the 1999 total observations
+> prediction_test <- knn(train = maindata.norm.df[,-7], test = Test_Data, 
++                        cl = maindata.norm.df[,7], k = 3, prob=TRUE) 
+> head(prediction_test)
+[1] 1
+Levels: 1
+> #Question 4: the model predicts that the customer will accept the loan offer
+> #Question 5
+> set.seed(2019)
+> Test_Index_1 = createDataPartition(UBank_data$Age, p= 0.2 , list=FALSE) #20% test data
+> Test_Data_1  = UBank_data [Test_Index_1,]
+> Rem_DATA = UBank_data[-Test_Index_1,] #80% remaining data [training + validation]
+> 
+> Train_Index_1 = createDataPartition(Rem_DATA$Age, p= 0.5 , list=FALSE)
+> Train_Data_1 = Rem_DATA[Train_Index_1,]
+> Validation_Data_1 = Rem_DATA[-Train_Index_1,]
+> train.norm.df_1 <- Train_Data_1
+> valid.norm.df_1 <- Validation_Data_1
+> test.norm.df_1 <- Test_Data_1
+> rem_data.norm.df_1 <- Rem_DATA
+> norm.values_1 <- preProcess(Train_Data_1[-7], method=c("center", "scale"))
+> 
+> train.norm.df_1[-7] <- predict(norm.values_1, Train_Data_1[-7])
+> valid.norm.df_1[-7] <- predict(norm.values_1, Validation_Data_1[-7])
+> test.norm.df_1[-7] <- predict(norm.values_1, test.norm.df_1[-7])
+> test.norm.df_1[-7] <- predict(norm.values_1, Test_Data_1[-7])
+> rem_data.norm.df_1[-7] <- predict(norm.values_1,Rem_DATA[-7])
+> head(test.norm.df_1)
+          Age Experience     Income     Family      CCAvg   Mortgage Personal.Loan
+16  1.2829377  0.8686599 -1.1472922 -1.1935339 -0.2821052 -0.5513052             0
+23 -1.4358939 -1.3293661 -0.2927939 -1.1935339 -0.4484833  1.9632437             0
+33  0.6690080  0.6928178 -0.7414055 -0.3258248 -0.7812396  1.3152638             0
+36  0.2304868  0.3411336  0.1130929  0.5418844 -0.7257802 -0.5513052             0
+41  1.0198250  1.0445019  0.1771802  0.5418844 -0.2266458 -0.5513052             0
+43 -1.1727812 -1.1535240  1.2025783  1.4095935 -0.5039427  3.4332877             1
+   Securities.Account CD.Account     Online CreditCard Education_1 Education_2
+16         -0.3387769 -0.2635981  0.8342689  1.5381222  -0.8825926   1.5605153
+23         -0.3387769 -0.2635981  0.8342689 -0.6498183   1.1324590  -0.6404936
+33         -0.3387769 -0.2635981 -1.1980549 -0.6498183  -0.8825926   1.5605153
+36         -0.3387769 -0.2635981 -1.1980549 -0.6498183   1.1324590  -0.6404936
+41          2.9503192 -0.2635981 -1.1980549 -0.6498183  -0.8825926   1.5605153
+43         -0.3387769 -0.2635981  0.8342689 -0.6498183  -0.8825926  -0.6404936
+   Education_3
+16  -0.6095541
+23  -0.6095541
+33  -0.6095541
+36  -0.6095541
+41  -0.6095541
+43   1.6397231
+> set.seed(2019)
+> prediction_Q5 <- knn(train = train.norm.df_1[,-7], test = valid.norm.df_1[,-7], 
++                      cl = train.norm.df_1[,7], k = 3, prob=TRUE)
+> actual= valid.norm.df_1$Personal.Loan
+> prediction_prob = attr(prediction_Q5,"prob")
+> 
+> table(prediction_Q5,actual)
+             actual
+prediction_Q5    0    1
+            0 1797   89
+            1    8  105
+> CrossTable(prediction_Q5,actual)
+
+ 
+   Cell Contents
+|-------------------------|
+|                       N |
+| Chi-square contribution |
+|           N / Row Total |
+|           N / Col Total |
+|         N / Table Total |
+|-------------------------|
+
+ 
+Total Observations in Table:  1999 
+
+ 
+              | actual 
+prediction_Q5 |         0 |         1 | Row Total | 
+--------------|-----------|-----------|-----------|
+            0 |      1797 |        89 |      1886 | 
+              |     5.192 |    48.310 |           | 
+              |     0.953 |     0.047 |     0.943 | 
+              |     0.996 |     0.459 |           | 
+              |     0.899 |     0.045 |           | 
+--------------|-----------|-----------|-----------|
+            1 |         8 |       105 |       113 | 
+              |    86.661 |   806.302 |           | 
+              |     0.071 |     0.929 |     0.057 | 
+              |     0.004 |     0.541 |           | 
+              |     0.004 |     0.053 |           | 
+--------------|-----------|-----------|-----------|
+ Column Total |      1805 |       194 |      1999 | 
+              |     0.903 |     0.097 |           | 
+--------------|-----------|-----------|-----------|
+
+ 
+> mean(prediction_Q5==actual)
+[1] 0.9514757
+> #Here there are 97 false predictions
+> library(FNN)
+> set.seed(2019)
+> prediction_Q5 <- knn(train = rem_data.norm.df_1[,-7], test = test.norm.df_1[,-7], 
++                      cl = rem_data.norm.df_1[,7], k = 3, prob=TRUE) 
+> actual= test.norm.df_1$Personal.Loan
+> prediction_prob = attr(prediction_Q5,"prob")
+> CrossTable(prediction_Q5,actual)
+
+ 
+   Cell Contents
+|-------------------------|
+|                       N |
+| Chi-square contribution |
+|           N / Row Total |
+|           N / Col Total |
+|         N / Table Total |
+|-------------------------|
+
+ 
+Total Observations in Table:  1001 
+
+ 
+              | actual 
+prediction_Q5 |         0 |         1 | Row Total | 
+--------------|-----------|-----------|-----------|
+            0 |       910 |        31 |       941 | 
+              |     3.355 |    33.964 |           | 
+              |     0.967 |     0.033 |     0.940 | 
+              |     0.999 |     0.344 |           | 
+              |     0.909 |     0.031 |           | 
+--------------|-----------|-----------|-----------|
+            1 |         1 |        59 |        60 | 
+              |    52.624 |   532.669 |           | 
+              |     0.017 |     0.983 |     0.060 | 
+              |     0.001 |     0.656 |           | 
+              |     0.001 |     0.059 |           | 
+--------------|-----------|-----------|-----------|
+ Column Total |       911 |        90 |      1001 | 
+              |     0.910 |     0.090 |           | 
+--------------|-----------|-----------|-----------|
+
+ 
+> mean(prediction_Q5==actual) 
+[1] 0.968032
+> #Here there are 32 false predictions for the Test Data
+> #Question 5: There were fewer false predictions for the Test data, therefore the model performed better with the test data, compared to the training data. This makes sense as the Test Data came from using 80% of the data, compared to only 50% for the training data.
