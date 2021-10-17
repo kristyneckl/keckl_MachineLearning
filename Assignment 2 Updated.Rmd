@@ -1,0 +1,148 @@
+---
+title: "Assignment 2 Revised"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+bank<-read.csv("UniversalBank.csv")
+library(caret)
+library(dplyr)
+library(ISLR)
+library(psych)
+library(FNN)
+library(class)
+
+bank<-read.csv("UniversalBank.csv")
+Ubank<-select(bank,-c(1,5))
+
+head(Ubank)
+
+summary(Ubank)
+ 
+ 
+dummy_Education<-as.data.frame(dummy.code(Ubank$Education))
+ 
+names(dummy_Education)<-c("Education_1","Education_2","Education_3")
+Ubank_wo_education<-subset(Ubank,select=-c(Education))
+Ubank_data<-cbind(Ubank_wo_education,dummy_Education)
+
+ 
+set.seed(15)
+Train_Index=createDataPartition(Ubank_data$Personal.Loan,p=0.6,list = FALSE)
+Train_Data=Ubank_data[Train_Index,]
+Validation_Data=Ubank_data[-Train_Index,]
+ 
+Test_Data<-data.frame(Age=40,Experience=10,Income=84,Family=2,CCAvg=2,Education_1=0,Education_2=1,Education_3=0,Mortgage=0,Securities.Account=0,CD.Account=0,Online=1,CreditCard=1,stringsAsFactors = FALSE)
+ 
+ 
+train.norm.df<-Train_Data
+valid.norm.df<-Validation_Data
+test.norm.df<-Test_Data
+maindata.norm.df<-Ubank_data
+ 
+head(maindata.norm.df)
+
+norm.values<-preProcess(Train_Data[,-7],method=c("center","scale"))
+ 
+train.norm.df[,-7]<-predict(norm.values,Train_Data[,-7])
+valid.norm.df[,-7]<-predict(norm.values,Validation_Data[,-7])
+test.norm.df<-predict(norm.values,Test_Data)
+maindata.norm.df[,-7]<-predict(norm.values,Ubank_data[,-7])
+ 
+head(maindata.norm.df)
+ 
+set.seed(15)
+prediction<-knn(train = train.norm.df[,-7],test = valid.norm.df[,-7],cl=train.norm.df[,7],k=1,prob = TRUE)
+actual=valid.norm.df$Personal.Loan
+prediction_prob=attr(prediction,"prob")
+ 
+table(prediction,actual)
+
+head(prediction)
+
+##Question 1 answer: The customer would be classified as not taking the loan.
+```
+
+
+```{r}
+
+accuracy.df<-data.frame(k=seq(1,60,1),accuracy=rep(0,60))
+
+for(i in 1:60) {prediction <- knn(train = train.norm.df[,-7], test = valid.norm.df[-7],cl=train.norm.df[,7], k = i, prob=TRUE) 
+accuracy.df[i,2]<-mean(prediction==actual)}
+accuracy.df
+
+##Question 2 answer: The value of k that provides the best results for balancing between overfitting and ignoring the predictor information is k=3
+```
+
+```{r}
+##Question 3
+library("gmodels")
+CrossTable(x=actual,y=prediction,prop.chisq = FALSE)
+```
+
+```{r}
+prediction_test <- knn(train = maindata.norm.df[,-7], test = Test_Data,cl = maindata.norm.df[,7], k = 3, prob=TRUE)
+ 
+head(prediction_test)
+
+##Question 4 answer: The customer would be classified as accepting the loan.
+```
+
+```{r}
+Test_Index1=createDataPartition(Ubank_data$Personal.Loan,p=0.2,list=FALSE)
+Test_Data1=Ubank_data[Test_Index1,]
+TraVal_Data=Ubank_data[-Test_Index1,]
+
+Train_Index1=createDataPartition(TraVal_Data$Personal.Loan,p=0.5,list=FALSE)
+Train_Data1=TraVal_Data[Train_Index1,]
+Validation_Data1=TraVal_Data[-Train_Index1,]
+
+train.norm.df1<-Train_Data1
+valid.norm.df1<-Validation_Data1
+test.norm.df1<-Test_Data1
+TraVal_Data.norm.df1<-TraVal_Data
+
+norm.values1<-preProcess(Train_Data1[-7],method=c("center","scale"))
+
+train.norm.df1[,-7]<-predict(norm.values1,Train_Data1[,-7])
+valid.norm.df1[,-7]<-predict(norm.values1,Validation_Data1[,-7])
+test.norm.df1[,-7]<-predict(norm.values1,Test_Data1[,-7])
+TraVal_Data.norm.df1[,-7]<-predict(norm.values1,TraVal_Data[,-7])
+
+##Testing Set
+prediction5<-knn(train=train.norm.df1[,-7],test=valid.norm.df1[,-7],cl=train.norm.df1[,7],k=3,prob = TRUE)
+
+actual=valid.norm.df1$Personal.Loan
+prediction_prob=attr(prediction5,"prob")
+
+CrossTable(x=actual,y=prediction5,prop.chisq = FALSE)
+
+mean(prediction5==actual)
+```
+```{r}
+##Training and Validation Set
+prediction_5<-knn(train = TraVal_Data.norm.df1[,-7],test = test.norm.df1[,-7],cl=TraVal_Data.norm.df1[,7],k=3,prob = TRUE)
+actual=test.norm.df1$Personal.Loan
+prediction_prob=attr(prediction_5,"prob")
+
+CrossTable(x=actual,y=prediction_5,prop.chisq = FALSE)
+
+mean(prediction_5==actual)
+
+##The model performed better in the test set because it had more data to learn from (80% compared to only 50%). The model was right 96.4% of the time in the test set, whereas in the training and validation set, it was only right about 96% of the time.
+```
+
+
+
+
