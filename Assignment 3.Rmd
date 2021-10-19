@@ -1,0 +1,105 @@
+---
+title: "Assignment 3"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+library(caret)
+library(ISLR)
+library(e1071)
+
+bank<-read.csv("UniversalBank.csv")
+
+summary(bank)
+```
+
+
+```{r}
+
+set.seed(123)
+
+Index_Train<-createDataPartition(bank$Personal.Loan,p=0.6,list = FALSE)
+Train<-bank[Index_Train,]
+Test<-bank[-Index_Train,]
+```
+
+
+```{r Question A}
+
+library(reshape)
+library(reshape2)
+
+melted.bank=melt(Train,id=c("CreditCard","Personal.Loan"),variable="Online")
+recast.bank=cast(melted.bank,CreditCard+Personal.Loan~Online)
+
+recast.bank[,c(1:2,14)]
+```
+
+
+```{r Question B}
+#The Probability that this customer will accept the loan offer = 91/3000 = 3.0%
+```
+
+
+```{r Question C}
+melted.bankc1=melt(Train,id=c("Personal.Loan"),variable = "Online")
+melted.bankc2=melt(Train,id=c("CreditCard"),variable = "Online")
+recast.bankc1=cast(melted.bankc1,Personal.Loan~Online)
+recast.bankc2=cast(melted.bankc2,CreditCard~Online)
+loan.online=recast.bankc1[,c(1,13)]
+loan.cc=recast.bankc2[,c(1,14)]
+loan.online
+loan.cc
+```
+
+
+```{r Question D}
+table(Train[,c(14,10)])
+
+table(Train[,c(13,10)])
+
+table(Train[,c(10)])
+
+#i. 91/(91+187) = 32.73%
+#ii. 179/(179+112) = 64.38%
+#iii. 288/(2712+288) = 9.6%
+#iv. 792/(792+1930) = 29.1%
+#v. 1620/(1620+1102) = 59.51%
+#vi. 2712/(2712+288) = 90.4%
+```
+
+
+```{r Question E}
+
+#P(Loan=1|CC=1,Online=1)
+(.3273*.6438*.096)/((.3273*.6438*.096)+(.291*.5951*.904))
+
+```
+
+
+```{r Question F}
+
+#The value obtained in the pivot table is a more acurate measurement. The naive bayes method does now need the same independent classifications to predict because of the independence assumptions.
+
+```
+
+```{r Question G}
+library("e1071")
+library("gmodels")
+nb_model<-naiveBayes(Personal.Loan~Online+CreditCard,data = Train)
+Predicted_Test_labels<-predict(nb_model,Test)
+CrossTable(x=Test$Personal.Loan,y=Predicted_Test_labels,prop.chisq = FALSE)
+
+#0.101 is the output from the Naive Bayes method above. it is similar to the .1144 we found in part E. the 0.101 is the entry that corresponds to P(Loan=1|CC=1,Online=1)
+```
+
